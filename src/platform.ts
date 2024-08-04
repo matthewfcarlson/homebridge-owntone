@@ -70,14 +70,14 @@ export class OwntoneSpeakerPlatform implements DynamicPlatformPlugin {
 
     try {
       const host = `http://${this.config.serverip}:${this.config.serverport}/`;
-      let configResponse = await fetch(`${host}api/config`);
-      if (configResponse.status == 200) {
-        let configJSON = await configResponse.json() as OwntoneAPIConfigResponse;
-        this.log.debug("Found version: " + configJSON.version);
+      const configResponse = await fetch(`${host}api/config`);
+      if (configResponse.status <= 204) {
+        const configJSON = await configResponse.json() as OwntoneAPIConfigResponse;
+        this.log.debug('Found version: ' + configJSON.version);
         const accessoryConfig: OwntoneAccessoryConfig = {
           host,
           ...configJSON,
-        }
+        };
         const uuid = this.api.hap.uuid.generate(host);
         // see if an accessory with the same uuid has already been registered and restored from
         // the cached devices we stored in the `configureAccessory` method above
@@ -96,7 +96,7 @@ export class OwntoneSpeakerPlatform implements DynamicPlatformPlugin {
         } else {
           this.log.info('Adding new accessory:', this.config.name);
           // create a new accessory
-          const accessory = new this.api.platformAccessory("Owntone", uuid);
+          const accessory = new this.api.platformAccessory('Owntone', uuid);
           // store a copy of the device object in the `accessory.context`
           accessory.context.device = accessoryConfig;
           accessory.category = this.api.hap.Categories.SPEAKER;

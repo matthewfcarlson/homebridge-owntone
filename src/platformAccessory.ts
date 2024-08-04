@@ -39,7 +39,8 @@ export class OwntoneSpeakerAccessory {
       .onSet(this.handleOnSet.bind(this));
 
     // Now create a new smart speaker service
-    this.speakerService = this.accessory.getService(this.platform.Service.Speaker) || this.accessory.addService(this.platform.Service.Speaker);
+    this.speakerService = this.accessory.getService(this.platform.Service.Speaker)
+                        || this.accessory.addService(this.platform.Service.Speaker);
 
     // give it a name
     this.service.setCharacteristic(this.platform.Characteristic.Name, 'Owntone Speaker');
@@ -54,7 +55,7 @@ export class OwntoneSpeakerAccessory {
 
     this.speakerService.getCharacteristic(this.platform.Characteristic.Volume)
       .onGet(this.handleVolumeGet.bind(this))
-      .onSet(this.handleVolumeSet.bind(this))
+      .onSet(this.handleVolumeSet.bind(this));
 
     //  this.speakerService.getCharacteristic(this.platform.Characteristic.Active)
     //   .onGet(this.handleOnGet.bind(this))
@@ -62,7 +63,7 @@ export class OwntoneSpeakerAccessory {
 
     this.speakerService.getCharacteristic(this.platform.Characteristic.Mute)
       .onGet(this.handleMuteGet.bind(this))
-      .onSet(this.handleMuteSet.bind(this))
+      .onSet(this.handleMuteSet.bind(this));
   }
 
   /**
@@ -123,10 +124,10 @@ export class OwntoneSpeakerAccessory {
     this.platform.log.debug('Triggered GET On');
     //gets the global playing state
     try {
-      let player = await fetch(`${this.config.host}api/player`);
-      let playerJSON = await player.json() as OwntoneAPIPlayerResponse;
+      const player = await fetch(`${this.config.host}api/player`);
+      const playerJSON = await player.json() as OwntoneAPIPlayerResponse;
       this.platform.log.debug('Player:', playerJSON);
-      if (playerJSON.state == 'play') {
+      if (playerJSON.state === 'play') {
         return 1;
       }
       return 0;
@@ -143,7 +144,7 @@ export class OwntoneSpeakerAccessory {
     const url = (value) ? `${this.config.host}api/player/play` : `${this.config.host}api/player/pause`;
     this.platform.log.debug('Triggered SET On:', value, url);
     try{
-      let result = await fetch(url, { method: 'PUT' });
+      const result = await fetch(url, { method: 'PUT' });
       this.platform.log.debug('Triggered SET On:', value, result);
       if (result.status > 204 && value) {
         this.service.setCharacteristic(this.platform.Characteristic.On, false);
