@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "OwnToneSpeaker",
   "pluginType": "platform",
   "singular": true,
   "schema": {
@@ -8,9 +8,37 @@
       "name": {
         "title": "Name",
         "type": "string",
-        "required": true,
-        "default": "Example Dynamic Platform"
+        "required": true
+      },
+      "serverip":{
+        "title": "Server IP Address",
+        "type": "string",
+        "description": "The IPv4 address of your OwnTone Server. Leave blank for localhost",
+        "format": "ipv4",
+        "required": false
+      },
+      "serverport":{
+        "title": "Server Port",
+        "type": "string",
+        "description": "The port of your OwnTone Server. Leave black if unchanged from default",
+        "default": "3689",
+        "minLength": 4,
+        "maxLength": 4,
+        "required": false
+      },
+      "debug":{
+        "title": "Debug",
+        "type": "boolean",
+        "description": "Whether to enable debug logging",
+        "default": false,
+        "required": false
       }
     }
-  }
+  },
+  "form": [
+    "name",
+    "serverip",
+    "serverport",
+    "debug"
+  ]
 }

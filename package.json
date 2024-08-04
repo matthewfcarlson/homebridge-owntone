@@ -1,21 +1,21 @@
 {
   "private": true,
-  "displayName": "Plugin Name",
-  "name": "homebridge-plugin-name",
+  "displayName": "OwnTone Speaker",
+  "name": "homebridge-owntone-speaker",
   "version": "1.0.0",
-  "description": "A short description about what your plugin does.",
+  "description": "Allows a single owntone instance to show up as a smart speaker, allowing for play and pause.",
   "license": "Apache-2.0",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "git+https://github.com/matthewfcarlson/homebridge-owntone.git"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://github.com/matthewfcarlson/homebridge-owntone/issues"
   },
   "engines": {
     "node": "^18.20.4 || ^20.16.0 || ^22.5.1",
-    "homebridge": "^1.8.0 || ^2.0.0-beta.0"
+    "homebridge": "^1.6.1 || ^2.0.0-beta.0"
   },
   "main": "dist/index.js",
   "scripts": {

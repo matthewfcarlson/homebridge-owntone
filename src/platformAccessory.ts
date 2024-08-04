@@ -1,141 +1,175 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
-import { ExampleHomebridgePlatform } from './platform.js';
+import { OwntoneAccessoryConfig, OwntoneSpeakerPlatform } from './platform.js';
+
+interface OwntoneAPIPlayerResponse {
+  state: 'play' | 'pause' | 'stop';
+  volume: number;
+}
 
 /**
  * Platform Accessory
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class ExamplePlatformAccessory {
+export class OwntoneSpeakerAccessory {
   private service: Service;
-
-  /**
-   * These are just used to create a working example
-   * You should implement your own code to track the state of your accessory
-   */
-  private exampleStates = {
-    On: false,
-    Brightness: 100,
-  };
+  private speakerService: Service;
+  private config: OwntoneAccessoryConfig;
 
   constructor(
-    private readonly platform: ExampleHomebridgePlatform,
+    private readonly platform: OwntoneSpeakerPlatform,
     private readonly accessory: PlatformAccessory,
   ) {
-
+    this.platform.log.debug('Constructed accessory:', accessory.displayName);
+    this.config = accessory.context.device as OwntoneAccessoryConfig;
+    // this.platform.log.debug('Constructed accessory:', accessory.context);
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Owntone')
       .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial')
+      .setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.library_name)
+      .setCharacteristic(this.platform.Characteristic.FirmwareRevision, accessory.context.device.version);
 
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
-    // you can create multiple services for each accessory
-    this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
-
-    // set the service name, this is what is displayed as the default name on the Home app
-    // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
-
-    // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
-
-    // register handlers for the On/Off Characteristic
+    this.service = this.accessory.getService(this.platform.Service.Switch) || this.accessory.addService(this.platform.Service.Switch);
+    // create handlers for required characteristics
     this.service.getCharacteristic(this.platform.Characteristic.On)
-      .onSet(this.setOn.bind(this))                // SET - bind to the `setOn` method below
-      .onGet(this.getOn.bind(this));               // GET - bind to the `getOn` method below
+      .onGet(this.handleOnGet.bind(this))
+      .onSet(this.handleOnSet.bind(this));
 
-    // register handlers for the Brightness Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
+    // Now create a new smart speaker service
+    this.speakerService = this.accessory.getService(this.platform.Service.Speaker) || this.accessory.addService(this.platform.Service.Speaker);
 
-    /**
-     * Creating multiple services of the same type.
-     *
-     * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
-     * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
-     * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
-     *
-     * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
-     * can use the same subtype id.)
-     */
+    // give it a name
+    this.service.setCharacteristic(this.platform.Characteristic.Name, 'Owntone Speaker');
 
-    // Example: add two "motion sensor" services to the accessory
-    const motionSensorOneService = this.accessory.getService('Motion Sensor One Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
+    // create handlers for required characteristics
+    // this.speakerService.getCharacteristic(this.platform.Characteristic.CurrentMediaState)
+    //   .onGet(this.handleCurrentMediaStateGet.bind(this));
 
-    const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
+    // this.speakerService.getCharacteristic(this.platform.Characteristic.TargetMediaState)
+    //   .onGet(this.handleTargetMediaStateGet.bind(this))
+    //   .onSet(this.handleTargetMediaStateSet.bind(this));
 
-    /**
-     * Updating characteristics values asynchronously.
-     *
-     * Example showing how to update the state of a Characteristic asynchronously instead
-     * of using the `on('get')` handlers.
-     * Here we change update the motion sensor trigger states on and off every 10 seconds
-     * the `updateCharacteristic` method.
-     *
-     */
-    let motionDetected = false;
-    setInterval(() => {
-      // EXAMPLE - inverse the trigger
-      motionDetected = !motionDetected;
+    this.speakerService.getCharacteristic(this.platform.Characteristic.Volume)
+      .onGet(this.handleVolumeGet.bind(this))
+      .onSet(this.handleVolumeSet.bind(this))
 
-      // push the new value to HomeKit
-      motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-      motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
+    //  this.speakerService.getCharacteristic(this.platform.Characteristic.Active)
+    //   .onGet(this.handleOnGet.bind(this))
+    //   .onSet(this.handleOnSet.bind(this))
 
-      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, 10000);
+    this.speakerService.getCharacteristic(this.platform.Characteristic.Mute)
+      .onGet(this.handleMuteGet.bind(this))
+      .onSet(this.handleMuteSet.bind(this))
   }
 
   /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
+   * Handle requests to get the current value of the "Current Media State" characteristic
    */
-  async setOn(value: CharacteristicValue) {
-    // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
+  handleCurrentMediaStateGet() {
+    this.platform.log.debug('Triggered GET CurrentMediaState');
 
-    this.platform.log.debug('Set Characteristic On ->', value);
+    // set this to a valid value for CurrentMediaState
+    const currentValue = this.platform.Characteristic.CurrentMediaState.PLAY;
+
+    return currentValue;
+  }
+
+
+  /**
+   * Handle requests to get the current value of the "Target Media State" characteristic
+   */
+  handleTargetMediaStateGet() {
+    this.platform.log.debug('Triggered GET TargetMediaState');
+
+    // set this to a valid value for TargetMediaState
+    const currentValue = this.platform.Characteristic.TargetMediaState.PLAY;
+
+    return currentValue;
   }
 
   /**
-   * Handle the "GET" requests from HomeKit
-   * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
-   *
-   * GET requests should return as fast as possible. A long delay here will result in
-   * HomeKit being unresponsive and a bad user experience in general.
-   *
-   * If your device takes time to respond you should update the status of your device
-   * asynchronously instead using the `updateCharacteristic` method instead.
-
-   * @example
-   * this.service.updateCharacteristic(this.platform.Characteristic.On, true)
+   * Handle requests to set the "Target Media State" characteristic
    */
-  async getOn(): Promise<CharacteristicValue> {
-    // implement your own code to check if the device is on
-    const isOn = this.exampleStates.On;
-
-    this.platform.log.debug('Get Characteristic On ->', isOn);
-
-    // if you need to return an error to show the device as "Not Responding" in the Home app:
-    // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-
-    return isOn;
+  handleTargetMediaStateSet(value: CharacteristicValue) {
+    this.platform.log.debug('Triggered SET TargetMediaState:', value);
   }
 
   /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, changing the Brightness
-   */
-  async setBrightness(value: CharacteristicValue) {
-    // implement your own code to set the brightness
-    this.exampleStates.Brightness = value as number;
+  * Handle requests to get the current value of the "Target Media State" characteristic
+  */
+  handleVolumeGet() {
+    this.platform.log.debug('Triggered GET Volume');
 
-    this.platform.log.debug('Set Characteristic Brightness -> ', value);
+    // set this to a valid value for TargetMediaState
+    const currentValue = 100;
+
+    return currentValue;
+  }
+
+  /**
+   * Handle requests to set the "Target Media State" characteristic
+   */
+  handleVolumeSet(value: CharacteristicValue) {
+    this.platform.log.debug('Triggered SET Volume:', value);
+  }
+
+  /**
+  * Handle requests to get the current value of the "On" characteristic
+  */
+  async handleOnGet() {
+    this.platform.log.debug('Triggered GET On');
+    //gets the global playing state
+    try {
+      let player = await fetch(`${this.config.host}api/player`);
+      let playerJSON = await player.json() as OwntoneAPIPlayerResponse;
+      this.platform.log.debug('Player:', playerJSON);
+      if (playerJSON.state == 'play') {
+        return 1;
+      }
+      return 0;
+    } catch (error) {
+      this.platform.log.error('Error fetching player:', error);
+    }
+    return 0;
+  }
+
+  /**
+   * Handle requests to set the "On" characteristic
+   */
+  async handleOnSet(value: CharacteristicValue) {
+    const url = (value) ? `${this.config.host}api/player/play` : `${this.config.host}api/player/pause`;
+    this.platform.log.debug('Triggered SET On:', value, url);
+    try{
+      let result = await fetch(url, { method: 'PUT' });
+      this.platform.log.debug('Triggered SET On:', value, result);
+      if (result.status > 204 && value) {
+        this.service.setCharacteristic(this.platform.Characteristic.On, false);
+      }
+    } catch (error) {
+      this.service.setCharacteristic(this.platform.Characteristic.On, false);
+    }
+  }
+
+  /**
+ * Handle requests to get the current value of the "On" characteristic
+ */
+  handleMuteGet() {
+    this.platform.log.debug('Triggered GET Mute');
+
+    // set this to a valid value for On
+    const currentValue = 1;
+
+    return currentValue;
+  }
+
+  /**
+   * Handle requests to set the "On" characteristic
+   */
+  handleMuteSet(value: CharacteristicValue) {
+    this.platform.log.debug('Triggered SET Mute:', value);
   }
 
 }
