@@ -17,6 +17,12 @@ export class OwntoneSpeakerAccessory {
   private speakerService: Service;
   private config: OwntoneAccessoryConfig;
 
+  private currentPlayState: number | null = null;
+  private currentVolume: number | null = null;
+  private targetPlayState: number | null = null;
+  private targetVolume: number | null = null;
+  private currentLastUpdatedTimestamp: number | null = null;
+
   constructor(
     private readonly platform: OwntoneSpeakerPlatform,
     private readonly accessory: PlatformAccessory,
@@ -66,16 +72,43 @@ export class OwntoneSpeakerAccessory {
       .onSet(this.handleMuteSet.bind(this));
   }
 
+  private async getCurrentPlayerState() : Promise<OwntoneAPIPlayerResponse> {
+    if (this.currentPlayState == null || this.currentVolume == null || this.currentLastUpdatedTimestamp === null || (Date.now() - this.currentLastUpdatedTimestamp!) > 1000) {
+      //gets the global playing state
+      this.currentLastUpdatedTimestamp = Date.now();
+      try {
+        const player = await fetch(`${this.config.host}api/player`);
+        const playerJSON = await player.json() as OwntoneAPIPlayerResponse;
+        this.platform.log.debug('Player:', playerJSON);
+        if (playerJSON.state === 'play') {
+          this.currentPlayState = this.platform.Characteristic.CurrentMediaState.PLAY;
+        } else if (playerJSON.state === 'pause') {
+          this.currentPlayState = this.platform.Characteristic.CurrentMediaState.PAUSE;
+        } else {
+          this.currentPlayState = this.platform.Characteristic.CurrentMediaState.STOP;
+        }
+        this.currentVolume = playerJSON.volume;
+        
+      } catch (error) {
+        this.platform.log.error('Error fetching player:', error);
+      }
+    }
+
+    // return the current state
+    return {
+      state: this.currentPlayState === this.platform.Characteristic.CurrentMediaState.PLAY ? 'play' : this.currentPlayState === this.platform.Characteristic.CurrentMediaState.PAUSE ? 'pause' : 'stop',
+      volume: this.currentVolume || 0
+    };
+  }
+
   /**
    * Handle requests to get the current value of the "Current Media State" characteristic
    */
-  handleCurrentMediaStateGet() {
+  async handleCurrentMediaStateGet() {
     this.platform.log.debug('Triggered GET CurrentMediaState');
 
-    // set this to a valid value for CurrentMediaState
-    const currentValue = this.platform.Characteristic.CurrentMediaState.PLAY;
-
-    return currentValue;
+    let state = await this.getCurrentPlayerState();
+    return state.state == 'play' ? this.platform.Characteristic.CurrentMediaState.PLAY : this.platform.Characteristic.CurrentMediaState.PAUSE;
   }
 
 
@@ -85,36 +118,61 @@ export class OwntoneSpeakerAccessory {
   handleTargetMediaStateGet() {
     this.platform.log.debug('Triggered GET TargetMediaState');
 
-    // set this to a valid value for TargetMediaState
-    const currentValue = this.platform.Characteristic.TargetMediaState.PLAY;
-
-    return currentValue;
+    return this.targetPlayState || this.platform.Characteristic.TargetMediaState.STOP;
   }
 
   /**
    * Handle requests to set the "Target Media State" characteristic
    */
-  handleTargetMediaStateSet(value: CharacteristicValue) {
+  async handleTargetMediaStateSet(value: CharacteristicValue) {
     this.platform.log.debug('Triggered SET TargetMediaState:', value);
+    this.targetPlayState = value as number;
+    // Set the state immediately by clearing the queue if we stop or pause
+    if (value === this.platform.Characteristic.TargetMediaState.STOP || value === this.platform.Characteristic.TargetMediaState.PAUSE) {
+      const url = `${this.config.host}/api/queue/clear`;
+      try {
+        const result = await fetch(url, { method: 'PUT' });
+        this.platform.log.debug('Result from set STOP/PAUSE:', result);
+      } catch (error) {
+        this.platform.log.error('Error clearing queue:', error);
+      }
+    }
+    else {
+      // Try to play the queue
+      const url = `${this.config.host}/api/player/play`;
+      try {
+        const result = await fetch(url, { method: 'PUT' });
+        this.platform.log.debug('Result from set Play:', result);
+      } catch (error) {
+        this.platform.log.error('Error playing queue:', error);
+      }
+    }
   }
 
   /**
   * Handle requests to get the current value of the "Target Media State" characteristic
   */
-  handleVolumeGet() {
+  async handleVolumeGet() {
     this.platform.log.debug('Triggered GET Volume');
 
-    // set this to a valid value for TargetMediaState
-    const currentValue = 100;
-
-    return currentValue;
+    let state = await this.getCurrentPlayerState();
+    return state.volume;
   }
 
   /**
    * Handle requests to set the "Target Media State" characteristic
    */
-  handleVolumeSet(value: CharacteristicValue) {
+  async handleVolumeSet(value: CharacteristicValue) {
     this.platform.log.debug('Triggered SET Volume:', value);
+    this.targetVolume = value as number;
+    // Set the volume immediately
+    const url = `${this.config.host}api/player/volume?volume=${value}`;
+    try{
+      const result = await fetch(url, { method: 'PUT' });
+    } catch (error) {
+      this.platform.log.error('Error setting volume:', error);
+    }
+
   }
 
   /**
@@ -122,48 +180,25 @@ export class OwntoneSpeakerAccessory {
   */
   async handleOnGet() {
     this.platform.log.debug('Triggered GET On');
-    //gets the global playing state
-    try {
-      const player = await fetch(`${this.config.host}api/player`);
-      const playerJSON = await player.json() as OwntoneAPIPlayerResponse;
-      this.platform.log.debug('Player:', playerJSON);
-      if (playerJSON.state === 'play') {
-        return 1;
-      }
-      return 0;
-    } catch (error) {
-      this.platform.log.error('Error fetching player:', error);
-    }
-    return 0;
+    let state = await this.getCurrentPlayerState();
+    return state.state === 'play';
   }
 
   /**
    * Handle requests to set the "On" characteristic
    */
   async handleOnSet(value: CharacteristicValue) {
-    const url = (value) ? `${this.config.host}api/player/play` : `${this.config.host}api/player/pause`;
-    this.platform.log.debug('Triggered SET On:', value, url);
-    try{
-      const result = await fetch(url, { method: 'PUT' });
-      this.platform.log.debug('Triggered SET On:', value, result);
-      if (result.status > 204 && value) {
-        this.service.setCharacteristic(this.platform.Characteristic.On, false);
-      }
-    } catch (error) {
-      this.service.setCharacteristic(this.platform.Characteristic.On, false);
-    }
+    this.handleTargetMediaStateSet(value ? this.platform.Characteristic.TargetMediaState.PLAY : this.platform.Characteristic.TargetMediaState.STOP);
   }
 
   /**
  * Handle requests to get the current value of the "On" characteristic
  */
-  handleMuteGet() {
+  async handleMuteGet() {
     this.platform.log.debug('Triggered GET Mute');
 
-    // set this to a valid value for On
-    const currentValue = 1;
-
-    return currentValue;
+    let state = await this.getCurrentPlayerState();
+    return state.volume === 0 ? 1 : 0;
   }
 
   /**
@@ -171,6 +206,8 @@ export class OwntoneSpeakerAccessory {
    */
   handleMuteSet(value: CharacteristicValue) {
     this.platform.log.debug('Triggered SET Mute:', value);
+    // TODO: figure out what the volume was pre-mute, for now, just always set to zer0
+    this.handleVolumeSet(value ? 0 : 1);
   }
 
 }
