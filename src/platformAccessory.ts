@@ -46,7 +46,7 @@ export class OwntoneSpeakerAccessory {
 
     // Now create a new smart speaker service
     this.speakerService = this.accessory.getService(this.platform.Service.Speaker)
-                        || this.accessory.addService(this.platform.Service.Speaker);
+      || this.accessory.addService(this.platform.Service.Speaker);
 
     // give it a name
     this.service.setCharacteristic(this.platform.Characteristic.Name, 'Owntone Speaker');
@@ -72,8 +72,11 @@ export class OwntoneSpeakerAccessory {
       .onSet(this.handleMuteSet.bind(this));
   }
 
-  private async getCurrentPlayerState() : Promise<OwntoneAPIPlayerResponse> {
-    if (this.currentPlayState == null || this.currentVolume == null || this.currentLastUpdatedTimestamp === null || (Date.now() - this.currentLastUpdatedTimestamp!) > 1000) {
+  private async getCurrentPlayerState(): Promise<OwntoneAPIPlayerResponse> {
+    if (this.currentPlayState === null
+      || this.currentVolume === null
+      || this.currentLastUpdatedTimestamp === null
+      || (Date.now() - this.currentLastUpdatedTimestamp!) > 1000) {
       //gets the global playing state
       this.currentLastUpdatedTimestamp = Date.now();
       try {
@@ -96,7 +99,8 @@ export class OwntoneSpeakerAccessory {
 
     // return the current state
     return {
-      state: this.currentPlayState === this.platform.Characteristic.CurrentMediaState.PLAY ? 'play' : this.currentPlayState === this.platform.Characteristic.CurrentMediaState.PAUSE ? 'pause' : 'stop',
+      state: this.currentPlayState === this.platform.Characteristic.CurrentMediaState.PLAY ?
+        'play' : this.currentPlayState === this.platform.Characteristic.CurrentMediaState.PAUSE ? 'pause' : 'stop',
       volume: this.currentVolume || 0,
     };
   }
@@ -108,7 +112,8 @@ export class OwntoneSpeakerAccessory {
     this.platform.log.debug('Triggered GET CurrentMediaState');
 
     const state = await this.getCurrentPlayerState();
-    return state.state == 'play' ? this.platform.Characteristic.CurrentMediaState.PLAY : this.platform.Characteristic.CurrentMediaState.PAUSE;
+    return state.state === 'play' ? this.platform.Characteristic.CurrentMediaState.PLAY :
+      this.platform.Characteristic.CurrentMediaState.PAUSE;
   }
 
 
@@ -166,7 +171,7 @@ export class OwntoneSpeakerAccessory {
     this.targetVolume = value as number;
     // Set the volume immediately
     const url = `${this.config.host}api/player/volume?volume=${value}`;
-    try{
+    try {
       const result = await fetch(url, { method: 'PUT' });
       this.platform.log.debug('Result from set Volume:', result);
     } catch (error) {
@@ -188,7 +193,8 @@ export class OwntoneSpeakerAccessory {
    * Handle requests to set the "On" characteristic
    */
   async handleOnSet(value: CharacteristicValue) {
-    this.handleTargetMediaStateSet(value ? this.platform.Characteristic.TargetMediaState.PLAY : this.platform.Characteristic.TargetMediaState.STOP);
+    this.handleTargetMediaStateSet(value ? this.platform.Characteristic.TargetMediaState.PLAY :
+      this.platform.Characteristic.TargetMediaState.STOP);
   }
 
   /**
