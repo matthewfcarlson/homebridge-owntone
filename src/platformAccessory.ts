@@ -88,7 +88,7 @@ export class OwntoneSpeakerAccessory {
           this.currentPlayState = this.platform.Characteristic.CurrentMediaState.STOP;
         }
         this.currentVolume = playerJSON.volume;
-        
+
       } catch (error) {
         this.platform.log.error('Error fetching player:', error);
       }
@@ -97,7 +97,7 @@ export class OwntoneSpeakerAccessory {
     // return the current state
     return {
       state: this.currentPlayState === this.platform.Characteristic.CurrentMediaState.PLAY ? 'play' : this.currentPlayState === this.platform.Characteristic.CurrentMediaState.PAUSE ? 'pause' : 'stop',
-      volume: this.currentVolume || 0
+      volume: this.currentVolume || 0,
     };
   }
 
@@ -107,7 +107,7 @@ export class OwntoneSpeakerAccessory {
   async handleCurrentMediaStateGet() {
     this.platform.log.debug('Triggered GET CurrentMediaState');
 
-    let state = await this.getCurrentPlayerState();
+    const state = await this.getCurrentPlayerState();
     return state.state == 'play' ? this.platform.Characteristic.CurrentMediaState.PLAY : this.platform.Characteristic.CurrentMediaState.PAUSE;
   }
 
@@ -136,8 +136,7 @@ export class OwntoneSpeakerAccessory {
       } catch (error) {
         this.platform.log.error('Error clearing queue:', error);
       }
-    }
-    else {
+    } else {
       // Try to play the queue
       const url = `${this.config.host}/api/player/play`;
       try {
@@ -155,7 +154,7 @@ export class OwntoneSpeakerAccessory {
   async handleVolumeGet() {
     this.platform.log.debug('Triggered GET Volume');
 
-    let state = await this.getCurrentPlayerState();
+    const state = await this.getCurrentPlayerState();
     return state.volume;
   }
 
@@ -169,6 +168,7 @@ export class OwntoneSpeakerAccessory {
     const url = `${this.config.host}api/player/volume?volume=${value}`;
     try{
       const result = await fetch(url, { method: 'PUT' });
+      this.platform.log.debug('Result from set Volume:', result);
     } catch (error) {
       this.platform.log.error('Error setting volume:', error);
     }
@@ -180,7 +180,7 @@ export class OwntoneSpeakerAccessory {
   */
   async handleOnGet() {
     this.platform.log.debug('Triggered GET On');
-    let state = await this.getCurrentPlayerState();
+    const state = await this.getCurrentPlayerState();
     return state.state === 'play';
   }
 
@@ -197,7 +197,7 @@ export class OwntoneSpeakerAccessory {
   async handleMuteGet() {
     this.platform.log.debug('Triggered GET Mute');
 
-    let state = await this.getCurrentPlayerState();
+    const state = await this.getCurrentPlayerState();
     return state.volume === 0 ? 1 : 0;
   }
 
