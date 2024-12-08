@@ -1,7 +1,7 @@
 {
   "displayName": "OwnTone Speaker",
   "name": "homebridge-owntone-speaker",
-  "version": "1.0.1",
+  "version": "1.0.2-beta.0",
   "description": "Allows a single owntone instance to show up as a smart speaker, allowing for play and pause.",
   "license": "Apache-2.0",
   "type": "module",
